@@ -5,6 +5,9 @@ import streamlit as st
 
 DATA_URL = "https://raw.githubusercontent.com/happykth/data/main/kobis_movies.csv"
 
+# 대작 기준: 총 관객(total_audi)이 상위 몇 %인 영화를 대작으로 볼지 (0.2 = 상위 20%)
+BLOCKBUSTER_TOP_RATIO = 0.2
+
 st.set_page_config(page_title="영화 데이터 그래프 도감 2", layout="wide")
 st.title("영화 데이터 그래프 도감 2 - 분포와 관계")
 st.caption("1년간 박스오피스 10위권에 든 영화 가운데 이 기간에 개봉한 216편의 요약표")
@@ -319,74 +322,101 @@ st.plotly_chart(fig7, use_container_width=True)
 takeaway()
 
 # ---------------------------------------------------------------
-# 구역 8. 몇 월에 개봉한 영화가 관객을 많이 모을까? (막대 + 선)
+# 구역 8. 어느 시즌에 대작이 몰릴까? (막대 + 선)
 # ---------------------------------------------------------------
-chart_section("8. 개봉 월별 영화 편수와 평균 총 관객")
+chart_section("8. 계절별 대작 편수와 대작 비율")
 
-month_df = df.dropna(subset=["openDt"]).assign(month=lambda d: d["openDt"].dt.month)
-month_stats = (
-    month_df.groupby("month")
-    .agg(n=("movieCd", "size"), avg_audi=("total_audi", "mean"))
-    .reindex(range(1, 13))  # 개봉 영화가 없는 달도 자리를 유지
-)
-month_stats["n"] = month_stats["n"].fillna(0).astype(int)
-month_labels = [f"{m}월" for m in month_stats.index]
-month_custom = np.column_stack([month_stats["n"], month_stats["avg_audi"]])
+SEASONS = ["봄", "여름", "가을", "겨울"]
+SEASON_OF_MONTH = {
+    3: "봄", 4: "봄", 5: "봄",
+    6: "여름", 7: "여름", 8: "여름",
+    9: "가을", 10: "가을", 11: "가을",
+    12: "겨울", 1: "겨울", 2: "겨울",
+}
 
-month_hover = (
-    "<b>%{x}</b><br>"
-    "영화 편수: %{customdata[0]}편<br>"
-    "평균 총 관객: %{customdata[1]:,.0f}명"
-    "<extra></extra>"
-)
+# 개봉일과 총 관객을 모두 아는 영화만 사용 (대작 여부를 알 수 있어야 하므로)
+season_df = df.dropna(subset=["openDt", "total_audi"]).copy()
 
-fig8 = go.Figure()
-fig8.add_trace(
-    go.Bar(
-        x=month_labels,
-        y=month_stats["n"],
-        name="영화 편수",
-        customdata=month_custom,
-        hovertemplate=month_hover,
-        opacity=0.6,
-    )
-)
-fig8.add_trace(
-    go.Scatter(
-        x=month_labels,
-        y=month_stats["avg_audi"],
-        name="편당 평균 총 관객",
-        mode="lines+markers",
-        yaxis="y2",
-        customdata=month_custom,
-        hovertemplate=month_hover,
-        connectgaps=False,
-    )
-)
-fig8.update_layout(
-    margin=dict(t=20, b=20, l=20, r=20),
-    height=480,
-    xaxis=dict(title="개봉 월", categoryorder="array", categoryarray=month_labels),
-    yaxis=dict(title="영화 편수(편)"),
-    yaxis2=dict(title="편당 평균 총 관객(명)", overlaying="y", side="right", showgrid=False),
-    legend=dict(orientation="h", y=1.08),
-)
-st.plotly_chart(fig8, use_container_width=True)
-
-
-def months_text(months) -> str:
-    return ", ".join(f"{m}월" for m in months)
-
-
-if month_stats["avg_audi"].notna().any():
-    best_avg = month_stats["avg_audi"].max()
-    best_avg_months = month_stats.index[month_stats["avg_audi"] == best_avg]
-    most_n = month_stats["n"].max()
-    most_n_months = month_stats.index[month_stats["n"] == most_n]
-    takeaway(
-        f"편당 평균 관객이 가장 높은 달은 {months_text(best_avg_months)}"
-        f"(평균 {best_avg:,.0f}명)이고, "
-        f"영화 편수가 가장 많은 달은 {months_text(most_n_months)}({most_n}편)입니다."
-    )
-else:
+if season_df.empty:
+    st.info("개봉일과 총 관객이 모두 있는 영화가 없어요.")
     takeaway()
+else:
+    hit_line = season_df["total_audi"].quantile(1 - BLOCKBUSTER_TOP_RATIO)
+    season_df["is_hit"] = season_df["total_audi"] >= hit_line
+    season_df["season"] = season_df["openDt"].dt.month.map(SEASON_OF_MONTH)
+
+    st.caption(
+        f"대작 기준: 총 관객 상위 {BLOCKBUSTER_TOP_RATIO:.0%}"
+        f"(총 관객 {hit_line:,.0f}명 이상), "
+        f"분석 대상 {len(season_df)}편"
+    )
+
+    season_stats = (
+        season_df.groupby("season")
+        .agg(hits=("is_hit", "sum"), total=("is_hit", "size"))
+        .reindex(SEASONS)
+        .fillna(0)
+        .astype(int)
+    )
+    season_stats["ratio"] = (
+        season_stats["hits"] / season_stats["total"].replace(0, np.nan) * 100
+    )
+    season_custom = np.column_stack(
+        [season_stats["hits"], season_stats["total"], season_stats["ratio"]]
+    )
+    season_hover = (
+        "<b>%{x}</b><br>"
+        "대작 편수: %{customdata[0]}편<br>"
+        "전체 개봉 편수: %{customdata[1]}편<br>"
+        "대작 비율: %{customdata[2]:.1f}%"
+        "<extra></extra>"
+    )
+
+    fig8 = go.Figure()
+    fig8.add_trace(
+        go.Bar(
+            x=SEASONS,
+            y=season_stats["hits"],
+            name="대작 편수",
+            customdata=season_custom,
+            hovertemplate=season_hover,
+            opacity=0.6,
+        )
+    )
+    fig8.add_trace(
+        go.Scatter(
+            x=SEASONS,
+            y=season_stats["ratio"],
+            name="대작 비율",
+            mode="lines+markers",
+            yaxis="y2",
+            customdata=season_custom,
+            hovertemplate=season_hover,
+        )
+    )
+    fig8.update_layout(
+        margin=dict(t=20, b=20, l=20, r=20),
+        height=480,
+        xaxis=dict(title="계절", categoryorder="array", categoryarray=SEASONS),
+        yaxis=dict(title="대작 편수(편)"),
+        yaxis2=dict(
+            title="대작 비율(%)", overlaying="y", side="right",
+            showgrid=False, rangemode="tozero",
+        ),
+        legend=dict(orientation="h", y=1.08),
+    )
+    st.plotly_chart(fig8, use_container_width=True)
+
+    def seasons_text(names) -> str:
+        return ", ".join(names)
+
+    most_hits = season_stats["hits"].max()
+    most_hit_seasons = season_stats.index[season_stats["hits"] == most_hits]
+    best_ratio = season_stats["ratio"].max()
+    best_ratio_seasons = season_stats.index[season_stats["ratio"] == best_ratio]
+
+    takeaway(
+        f"대작이 가장 많이 몰린 계절은 {seasons_text(most_hit_seasons)}({most_hits}편)이고, "
+        f"대작 비율이 가장 높은 계절은 {seasons_text(best_ratio_seasons)}"
+        f"(개봉작의 {best_ratio:.1f}%)입니다."
+    )
