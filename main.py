@@ -317,3 +317,76 @@ fig7.update_layout(margin=dict(t=20, b=20, l=20, r=20), height=600)
 st.plotly_chart(fig7, use_container_width=True)
 
 takeaway()
+
+# ---------------------------------------------------------------
+# 구역 8. 몇 월에 개봉한 영화가 관객을 많이 모을까? (막대 + 선)
+# ---------------------------------------------------------------
+chart_section("8. 개봉 월별 영화 편수와 평균 총 관객")
+
+month_df = df.dropna(subset=["openDt"]).assign(month=lambda d: d["openDt"].dt.month)
+month_stats = (
+    month_df.groupby("month")
+    .agg(n=("movieCd", "size"), avg_audi=("total_audi", "mean"))
+    .reindex(range(1, 13))  # 개봉 영화가 없는 달도 자리를 유지
+)
+month_stats["n"] = month_stats["n"].fillna(0).astype(int)
+month_labels = [f"{m}월" for m in month_stats.index]
+month_custom = np.column_stack([month_stats["n"], month_stats["avg_audi"]])
+
+month_hover = (
+    "<b>%{x}</b><br>"
+    "영화 편수: %{customdata[0]}편<br>"
+    "평균 총 관객: %{customdata[1]:,.0f}명"
+    "<extra></extra>"
+)
+
+fig8 = go.Figure()
+fig8.add_trace(
+    go.Bar(
+        x=month_labels,
+        y=month_stats["n"],
+        name="영화 편수",
+        customdata=month_custom,
+        hovertemplate=month_hover,
+        opacity=0.6,
+    )
+)
+fig8.add_trace(
+    go.Scatter(
+        x=month_labels,
+        y=month_stats["avg_audi"],
+        name="편당 평균 총 관객",
+        mode="lines+markers",
+        yaxis="y2",
+        customdata=month_custom,
+        hovertemplate=month_hover,
+        connectgaps=False,
+    )
+)
+fig8.update_layout(
+    margin=dict(t=20, b=20, l=20, r=20),
+    height=480,
+    xaxis=dict(title="개봉 월", categoryorder="array", categoryarray=month_labels),
+    yaxis=dict(title="영화 편수(편)"),
+    yaxis2=dict(title="편당 평균 총 관객(명)", overlaying="y", side="right", showgrid=False),
+    legend=dict(orientation="h", y=1.08),
+)
+st.plotly_chart(fig8, use_container_width=True)
+
+
+def months_text(months) -> str:
+    return ", ".join(f"{m}월" for m in months)
+
+
+if month_stats["avg_audi"].notna().any():
+    best_avg = month_stats["avg_audi"].max()
+    best_avg_months = month_stats.index[month_stats["avg_audi"] == best_avg]
+    most_n = month_stats["n"].max()
+    most_n_months = month_stats.index[month_stats["n"] == most_n]
+    takeaway(
+        f"편당 평균 관객이 가장 높은 달은 {months_text(best_avg_months)}"
+        f"(평균 {best_avg:,.0f}명)이고, "
+        f"영화 편수가 가장 많은 달은 {months_text(most_n_months)}({most_n}편)입니다."
+    )
+else:
+    takeaway()
