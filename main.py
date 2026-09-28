@@ -77,3 +77,36 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 takeaway()
+
+# ---------------------------------------------------------------
+# 구역 2. 장르 안의 영화별 총 관객 (트리맵)
+# ---------------------------------------------------------------
+chart_section("2. 장르 안의 영화별 총 관객")
+
+movies = df.assign(total_audi=df["total_audi"].fillna(0))
+genre_totals = movies.groupby("genre")["total_audi"].sum()
+
+tree_ids = [f"g:{g}" for g in genre_totals.index] + movies["movieCd"].tolist()
+tree_labels = genre_totals.index.tolist() + movies["movieNm"].tolist()
+tree_parents = [""] * len(genre_totals) + [f"g:{g}" for g in movies["genre"]]
+tree_values = genre_totals.tolist() + movies["total_audi"].tolist()
+
+fig2 = go.Figure(
+    go.Treemap(
+        ids=tree_ids,
+        labels=tree_labels,
+        parents=tree_parents,
+        values=tree_values,
+        branchvalues="total",  # 장르 칸 = 안에 든 영화 관객의 합
+        textinfo="label",
+        hovertemplate=(
+            "<b>%{label}</b><br>"
+            "총 관객: %{value:,}명"
+            "<extra></extra>"
+        ),
+    )
+)
+fig2.update_layout(margin=dict(t=20, b=20, l=20, r=20), height=600)
+st.plotly_chart(fig2, use_container_width=True)
+
+takeaway()
