@@ -187,3 +187,44 @@ fig4.update_layout(
 st.plotly_chart(fig4, use_container_width=True)
 
 takeaway()
+
+# ---------------------------------------------------------------
+# 구역 5. 장르별 총 관객 분포 (상자 그림)
+# ---------------------------------------------------------------
+chart_section("5. 장르별 총 관객 분포 (영화 10편 이상인 장르)")
+
+MIN_MOVIES = 10
+box_df = df.dropna(subset=["total_audi"])
+genre_n = box_df["genre"].value_counts()
+big_genres = genre_n[genre_n >= MIN_MOVIES].index.tolist()  # 편수 많은 순
+
+if not big_genres:
+    st.info(f"영화가 {MIN_MOVIES}편 이상인 장르가 없어요.")
+else:
+    fig5 = go.Figure()
+    for genre_name in big_genres:
+        sub = box_df[box_df["genre"] == genre_name]
+        fig5.add_trace(
+            go.Box(
+                y=sub["total_audi"],
+                name=f"{genre_name} ({len(sub)}편)",
+                boxpoints="outliers",  # 상자 밖으로 튀는 점만 표시
+                hoveron="points",      # 튀는 점에 올렸을 때만 정보 표시
+                text=sub["movieNm"],
+                hovertemplate=(
+                    "<b>%{text}</b><br>"
+                    "총 관객: %{y:,}명"
+                    "<extra></extra>"
+                ),
+                showlegend=False,
+            )
+        )
+    fig5.update_layout(
+        margin=dict(t=20, b=20, l=20, r=20),
+        height=520,
+        xaxis_title="장르",
+        yaxis_title="총 관객(명)",
+    )
+    st.plotly_chart(fig5, use_container_width=True)
+
+takeaway()
