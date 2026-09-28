@@ -280,3 +280,40 @@ fig6.update_layout(
 st.plotly_chart(fig6, use_container_width=True)
 
 takeaway()
+
+# ---------------------------------------------------------------
+# 구역 7. 제작 국가 → 장르 (선버스트)
+# ---------------------------------------------------------------
+chart_section("7. 제작 국가에서 장르로 - 영화 편수")
+
+sun_df = df.assign(nation=df["nation"].fillna("미상").astype(str).str.strip())
+sun_df.loc[sun_df["nation"] == "", "nation"] = "미상"
+
+nation_counts = sun_df["nation"].value_counts()
+pair_counts = sun_df.groupby(["nation", "genre"]).size().reset_index(name="count")
+
+sun_ids = [f"n:{n}" for n in nation_counts.index] + [
+    f"n:{r.nation}|g:{r.genre}" for r in pair_counts.itertuples()
+]
+sun_labels = nation_counts.index.tolist() + pair_counts["genre"].tolist()
+sun_parents = [""] * len(nation_counts) + [f"n:{n}" for n in pair_counts["nation"]]
+sun_values = nation_counts.tolist() + pair_counts["count"].tolist()
+
+fig7 = go.Figure(
+    go.Sunburst(
+        ids=sun_ids,
+        labels=sun_labels,
+        parents=sun_parents,
+        values=sun_values,
+        branchvalues="total",  # 국가 칸 = 안에 든 장르 편수의 합
+        hovertemplate=(
+            "<b>%{label}</b><br>"
+            "편수: %{value}편"
+            "<extra></extra>"
+        ),
+    )
+)
+fig7.update_layout(margin=dict(t=20, b=20, l=20, r=20), height=600)
+st.plotly_chart(fig7, use_container_width=True)
+
+takeaway()
