@@ -148,3 +148,42 @@ takeaway(
     f"(이 구간 {counts[peak]}편, 전체의 {peak_share:.1f}%), "
     f"관객이 가장 많은 영화는 '{top['movieNm']}'({top['total_audi']:,.0f}명)입니다."
 )
+
+# ---------------------------------------------------------------
+# 구역 4. 개봉일 스크린수와 총 관객 (산점도)
+# ---------------------------------------------------------------
+chart_section("4. 개봉일 스크린수와 총 관객")
+
+scatter_df = df.dropna(subset=["first_scrn", "total_audi"])
+
+fig4 = go.Figure()
+for genre_name in scatter_df["genre"].value_counts().index:  # 편수 많은 장르부터
+    sub = scatter_df[scatter_df["genre"] == genre_name]
+    fig4.add_trace(
+        go.Scatter(
+            x=sub["first_scrn"],
+            y=sub["total_audi"],
+            mode="markers",
+            name=genre_name,  # 장르별 색과 범례
+            marker=dict(size=9, opacity=0.8),
+            text=sub["movieNm"],
+            customdata=sub[["genre"]],
+            hovertemplate=(
+                "<b>%{text}</b><br>"
+                "장르: %{customdata[0]}<br>"
+                "개봉일 스크린수: %{x:,}개<br>"
+                "총 관객: %{y:,}명"
+                "<extra></extra>"
+            ),
+        )
+    )
+fig4.update_layout(
+    margin=dict(t=20, b=20, l=20, r=20),
+    height=520,
+    xaxis_title="개봉일 스크린수(개)",
+    yaxis_title="총 관객(명)",
+    legend_title_text="장르",
+)
+st.plotly_chart(fig4, use_container_width=True)
+
+takeaway()
