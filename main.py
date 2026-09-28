@@ -228,3 +228,55 @@ else:
     st.plotly_chart(fig5, use_container_width=True)
 
 takeaway()
+
+# ---------------------------------------------------------------
+# 구역 6. 스크린수·총 관객·첫 주 관객 (버블 그래프)
+# ---------------------------------------------------------------
+chart_section("6. 개봉일 스크린수와 총 관객 - 점 크기는 첫 주 관객")
+
+bubble_df = df.dropna(subset=["first_scrn", "total_audi", "first_week_audi"])
+bubble_df = bubble_df[bubble_df["first_week_audi"] > 0]  # 0 이하는 점이 그려지지 않음
+
+# 모든 장르에서 같은 기준으로 크기가 정해지도록 sizeref를 한 번만 계산
+max_size = bubble_df["first_week_audi"].max()
+sizeref = 2.0 * max_size / (45**2)  # 가장 큰 버블의 지름이 약 45px
+
+fig6 = go.Figure()
+for genre_name in bubble_df["genre"].value_counts().index:
+    sub = bubble_df[bubble_df["genre"] == genre_name]
+    fig6.add_trace(
+        go.Scatter(
+            x=sub["first_scrn"],
+            y=sub["total_audi"],
+            mode="markers",
+            name=genre_name,
+            marker=dict(
+                size=sub["first_week_audi"],
+                sizemode="area",  # 면적이 첫 주 관객에 비례
+                sizeref=sizeref,
+                sizemin=3,
+                opacity=0.6,
+                line=dict(width=0.5, color="white"),
+            ),
+            text=sub["movieNm"],
+            customdata=sub[["genre", "first_week_audi"]],
+            hovertemplate=(
+                "<b>%{text}</b><br>"
+                "장르: %{customdata[0]}<br>"
+                "개봉일 스크린수: %{x:,}개<br>"
+                "첫 주 관객: %{customdata[1]:,}명<br>"
+                "총 관객: %{y:,}명"
+                "<extra></extra>"
+            ),
+        )
+    )
+fig6.update_layout(
+    margin=dict(t=20, b=20, l=20, r=20),
+    height=560,
+    xaxis_title="개봉일 스크린수(개)",
+    yaxis_title="총 관객(명)",
+    legend_title_text="장르",
+)
+st.plotly_chart(fig6, use_container_width=True)
+
+takeaway()
