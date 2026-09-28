@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -110,3 +111,40 @@ fig2.update_layout(margin=dict(t=20, b=20, l=20, r=20), height=600)
 st.plotly_chart(fig2, use_container_width=True)
 
 takeaway()
+
+# ---------------------------------------------------------------
+# 구역 3. 총 관객 분포 (히스토그램)
+# ---------------------------------------------------------------
+chart_section("3. 총 관객 분포")
+
+audi = df.dropna(subset=["total_audi"])
+counts, edges = np.histogram(audi["total_audi"], bins=30)
+bin_size = edges[1] - edges[0]
+
+fig3 = go.Figure(
+    go.Histogram(
+        x=audi["total_audi"],
+        xbins=dict(start=edges[0], end=edges[-1], size=bin_size),
+        hovertemplate="관객 구간: %{x}명<br>영화: %{y}편<extra></extra>",
+    )
+)
+fig3.update_layout(
+    margin=dict(t=20, b=20, l=20, r=20),
+    height=450,
+    xaxis_title="총 관객(명)",
+    yaxis_title="영화 편수",
+    bargap=0.05,
+)
+st.plotly_chart(fig3, use_container_width=True)
+
+# 가장 많은 영화가 몰린 구간과 관객이 가장 많은 영화
+peak = int(np.argmax(counts))
+lo, hi = edges[peak], edges[peak + 1]
+peak_share = counts[peak] / len(audi) * 100
+top = audi.loc[audi["total_audi"].idxmax()]
+
+takeaway(
+    f"영화 대부분은 총 관객 {lo:,.0f}명~{hi:,.0f}명 구간에 몰려 있고"
+    f"(이 구간 {counts[peak]}편, 전체의 {peak_share:.1f}%), "
+    f"관객이 가장 많은 영화는 '{top['movieNm']}'({top['total_audi']:,.0f}명)입니다."
+)
